@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc as cabc
 import os
+import stat
 import re
 import sys
 import typing as t
@@ -137,8 +138,15 @@ class _LazyFile:
             if "r" in mode:
                 # Open and close the file in case we're opening it for
                 # reading so that we can catch at least some errors in
-                # some cases early.
-                open(filename, mode).close()
+                # some cases early. Skip this for fifos: opening and
+                # closing a named pipe can drain or break it, so the
+                # subsequent real open would hang or fail.
+                try:
+                    st = os.stat(self.name)
+                except OSError:
+                    st = None
+                if st is None or not stat.S_ISFIFO(st.st_mode):
+                    open(filename, mode).close()
             self._f = None
             self.should_close = True
 
